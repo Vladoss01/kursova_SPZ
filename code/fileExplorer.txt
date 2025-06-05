@@ -1,0 +1,311 @@
+#define _CRT_SECURE_NO_WARNINGS
+#include <iostream>
+#include <vector>
+#include <string>
+#include <stack>
+#include <Windows.h>
+#include <conio.h>
+#include <filesystem>
+#include <conio.h> 
+
+enum class MenuOption { Option1, Option2, Option3, Option4, Option5, Option6, Option7, Option8, Option9, Quit };
+using namespace std;
+
+void SetColor(int color) {
+    SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), color);
+}
+
+void openFile(const std::string& path) {
+    SetConsoleCP(1251); SetConsoleOutputCP(1251);
+
+    char* cstr = new char[path.length() + 1];
+    std::strcpy(cstr, path.c_str());
+
+    HANDLE hFile = CreateFileA(
+        cstr,
+        GENERIC_READ,
+        0,
+        NULL,
+        OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL,
+        NULL
+    );
+    if (hFile == INVALID_HANDLE_VALUE) {
+        cerr << "Не вдалося відкрити файл. Помилка: " << GetLastError() << endl;
+        cout << "Натисніть будь-яку клавішу, щоб продовжити...";
+        cin.get();
+        return;
+    }
+    DWORD dwBytesRead;
+    char buffer;
+    while (ReadFile(hFile, &buffer, sizeof(buffer), &dwBytesRead, NULL) && dwBytesRead > 0) {
+        cout << buffer;
+    }
+    cout << endl;
+    CloseHandle(hFile);
+    cout << "Файл успішно прочитано." << endl;
+    cin.get();
+}
+
+void openDirectory(const wstring& dirPath) {
+    SetConsoleCP(1251); SetConsoleOutputCP(1251);
+
+    WIN32_FIND_DATA FindFileData;
+    HANDLE hFind = FindFirstFile((dirPath + L"\\*").c_str(), &FindFileData);
+    if (hFind == INVALID_HANDLE_VALUE) {
+        cout << "Помилка відкриття каталогу." << endl;
+        return;
+    }
+    do {
+        wcout << FindFileData.cFileName << endl;
+    } while (FindNextFile(hFind, &FindFileData) != 0);
+    FindClose(hFind);
+}
+
+void createDirectory(const wstring& dirPath) {
+    SetConsoleCP(1251); SetConsoleOutputCP(1251);
+
+    if (!CreateDirectory(dirPath.c_str(), NULL)) {
+        cout << "Помилка створення каталогу." << endl;
+    }
+    else {
+        cout << "Каталог успішно створено." << endl;
+    }
+}
+
+void createFile(const std::string& path) {
+    SetConsoleCP(1251); SetConsoleOutputCP(1251);
+
+    char* cstr = new char[path.length() + 1];
+    std::strcpy(cstr, path.c_str());
+
+    HANDLE hFile = CreateFileA(
+        cstr,
+        GENERIC_WRITE,
+        0,
+        NULL,
+        CREATE_ALWAYS,
+        FILE_ATTRIBUTE_NORMAL,
+        NULL
+    );
+    if (hFile == INVALID_HANDLE_VALUE) {
+        cerr << "Не вдалося створити файл. Помилка: " << GetLastError() << endl;
+    }
+    else {
+        cout << "Файл успішно створено." << endl;
+        CloseHandle(hFile);
+    }
+    delete[] cstr;
+}
+
+void writeToFile(const wstring& filePath) {
+    SetConsoleCP(1251); SetConsoleOutputCP(1251);
+
+    HANDLE hFile = CreateFile(filePath.c_str(), GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hFile == INVALID_HANDLE_VALUE) {
+        cout << "Помилка при відкритті файлу для запису." << endl;
+        return;
+    }
+
+    cout << "Куди ви хочете записати:\n1. Початок файлу\n2. Кінець файлу" << endl;
+    int positionChoice;
+    cin >> positionChoice;
+
+    DWORD dwNewPointer;
+    if (positionChoice == 1) {
+        dwNewPointer = SetFilePointer(hFile, 0, NULL, FILE_BEGIN);
+    }
+    else {
+        dwNewPointer = SetFilePointer(hFile, 0, NULL, FILE_END);
+    }
+    if (dwNewPointer == INVALID_SET_FILE_POINTER) {
+        cout << "Помилка встановлення вказівника файлу." << endl;
+        CloseHandle(hFile);
+        return;
+    }
+
+    cout << "Введіть текст для запису: ";
+    string text;
+    cin.ignore();
+    getline(cin, text);
+
+    DWORD dwBytesToWrite = static_cast<DWORD>(text.length());
+    DWORD dwBytesWritten = 0;
+    BOOL bSuccess = WriteFile(hFile, text.c_str(), dwBytesToWrite, &dwBytesWritten, NULL);
+    if (!bSuccess || dwBytesWritten != dwBytesToWrite) {
+        cout << "Помилка запису у файл." << endl;
+    }
+    else {
+        cout << "Текст успішно записано." << endl;
+    }
+    CloseHandle(hFile);
+}
+
+void openFileInNewWindow(const std::string& filename) {
+    SetConsoleCP(1251); SetConsoleOutputCP(1251);
+
+    std::string command = "start " + filename;
+    if (system(command.c_str()) == -1) {
+        cout << "Не вдалося відкрити файл." << endl;
+    }
+}
+
+void deleteFile(const std::string& filePath) {
+    SetConsoleCP(1251); SetConsoleOutputCP(1251);
+
+    if (DeleteFileA(filePath.c_str()) == 0) {
+        cerr << "Не вдалося видалити файл. Код помилки: " << GetLastError() << endl;
+    }
+    else {
+        cout << "Файл успішно видалено." << endl;
+    }
+}
+
+void deleteDirectory(const std::string& dirPath) {
+    SetConsoleCP(1251); SetConsoleOutputCP(1251);
+    char* cstr = new char[dirPath.length() + 1];
+    std::strcpy(cstr, dirPath.c_str());
+    if (!RemoveDirectoryA(cstr)) {
+        cerr << "Не вдалося видалити каталог. Код помилки: " << GetLastError() << endl;
+    }
+    else {
+        cout << "Каталог успішно видалено." << endl;
+    }
+    delete[] cstr;
+}
+
+void renameFileOrFolder(const std::string& oldName, const std::string& newName) {
+    SetConsoleCP(1251); SetConsoleOutputCP(1251);
+
+    try {
+        std::filesystem::rename(oldName, newName);
+        cout << "Перейменовано успішно." << endl;
+    }
+    catch (const std::filesystem::filesystem_error& e) {
+        cout << "Помилка перейменування: " << e.what() << endl;
+    }
+}
+
+void waitForKeypress() {
+    SetConsoleCP(1251); SetConsoleOutputCP(1251);
+    cout << "Натисніть будь-яку клавішу для продовження...";
+    _getch();
+}
+
+int main() {
+    MenuOption selected = MenuOption::Option1;
+    bool quit = false;
+
+    while (!quit) {
+        SetConsoleCP(1251); SetConsoleOutputCP(1251);
+        system("cls"); // Clear the console screen
+        SetColor(8); 
+        cout << "  Вас вітає файловий менеджер створений Петренко В.\n\n";
+
+        SetColor(3); 
+        cout << "______________________________________________________\n\n";
+        SetColor(6); // Cyan text
+        cout << "  Оберіть опцію:                                  \n\n";
+        cout << "  1. Створити директорію            " << (selected == MenuOption::Option1 ? "<--" : "") << " \n";
+        cout << "  2. Створити файл                  " << (selected == MenuOption::Option2 ? "<--" : "") << " \n";
+        cout << "  3. Видалити директорію            " << (selected == MenuOption::Option3 ? "<--" : "") << " \n";
+        cout << "  4. Видалити файл                  " << (selected == MenuOption::Option4 ? "<--" : "") << " \n";
+        cout << "  5. Переглянути вміст директорії   " << (selected == MenuOption::Option5 ? "<--" : "") << " \n";
+        cout << "  6. Прочитати файл                 " << (selected == MenuOption::Option6 ? "<--" : "") << " \n";
+        cout << "  7. Перейменувати файл/папку       " << (selected == MenuOption::Option7 ? "<--" : "") << " \n";
+        cout << "  8. Вихід                          " << (selected == MenuOption::Option8 ? "<--" : "") << " \n";
+        cout << "  9. Допомога                       " << (selected == MenuOption::Option9 ? "<--" : "") << " \n\n";
+        SetColor(3); 
+        cout << "______________________________________________________\n\n";
+        SetColor(6);
+        int key = _getch();
+        if (key == 224) { // Arrow keys
+            key = _getch();
+            if (key == 72) selected = static_cast<MenuOption>((static_cast<int>(selected) - 1 + 10) % 10); // Up
+            if (key == 80) selected = static_cast<MenuOption>((static_cast<int>(selected) + 1) % 10); // Down
+        }
+        else if (key == 13) { // Enter
+            switch (selected) {
+            case MenuOption::Option1: {
+                wstring dirPath;
+                cout << "Введіть шлях до директорії: ";
+                wcin >> dirPath;
+                createDirectory(dirPath);
+                waitForKeypress();
+                break;
+            }
+            case MenuOption::Option2: {
+                string filePath;
+                cout << "Введіть шлях до файлу: ";
+                cin >> filePath;
+                createFile(filePath);
+                waitForKeypress();
+                break;
+            }
+            case MenuOption::Option3: {
+                string dirPath;
+                cout << "Введіть шлях до каталогу: ";
+                cin >> dirPath;
+                deleteDirectory(dirPath);
+                waitForKeypress();
+                break;
+            }
+            case MenuOption::Option4: {
+                string filePath;
+                cout << "Введіть шлях до файлу: ";
+                cin >> filePath;
+                deleteFile(filePath);
+                waitForKeypress();
+                break;
+            }
+            case MenuOption::Option5: {
+                wstring dirPath;
+                cout << "Введіть шлях до файлу: ";
+                wcin >> dirPath;
+                openDirectory(dirPath);
+                waitForKeypress();
+                break;
+            }
+            case MenuOption::Option6: {
+                string filePath;
+                cout << "Введіть шлях до файлу: ";
+                cin >> filePath;
+                openFileInNewWindow(filePath);
+                waitForKeypress();
+                break;
+            }
+            case MenuOption::Option7: {
+                string oldName, newName;
+                cout << "Введіть поточне ім'я: ";
+                cin >> oldName;
+                cout << "Введіть нове ім'я: ";
+                cin >> newName;
+                renameFileOrFolder(oldName, newName);
+                waitForKeypress();
+                break;
+            }
+            case MenuOption::Option8: {
+                quit = true;
+                break;
+            }
+            case MenuOption::Option9: {
+                cout << "Допомога - Інструкції по файловому менеджеру\n"
+                    << "1. Створити каталог: Введіть шлях для створення нового каталогу.\n"
+                    << "2. Створити файл: Введіть шлях для створення нового файлу.\n"
+                    << "3. Видалити каталог: Введіть шлях для видалення існуючого каталогу.\n"
+                    << "4. Видалити файл: Введіть шлях для видалення існуючого файлу.\n"
+                    << "5. Перегляд вмісту каталогу: Введіть шлях для перегляду вмісту каталогу.\n"
+                    << "6. Відкрити файл: Введіть шлях для відкриття файлу у новому вікні.\n"
+                    << "7. Перейменувати файл/каталог: Введіть поточне та нове ім'я для перейменування.\n"
+                    << "8. Вийти: Вийти з програми.\n"
+                    << "9. Допомога: Показати це повідомлення допомоги.\n";
+                waitForKeypress();
+                break;
+            }
+            default:
+                break;
+            }
+        }
+    }
+    return 0;
+}
